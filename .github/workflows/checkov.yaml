@@ -56,10 +56,12 @@ jobs:
       - name: Run ASH
         continue-on-error: true
         run: |
-          ash --mode local --config ash.yaml
+          echo "Verify ash.yaml"
+          cat ./ash.yaml
+          ash --mode local --config ./ash.yaml
 
       - name: Upload HTML report
         uses: actions/upload-artifact@v4
         with:
-          name: ash-html-report
-          path: ash-report
+          name: ash-reports
+          path: .ash/ash_output/reports/
