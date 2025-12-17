@@ -1,0 +1,80 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: CloudFormation template to create a s3 bucket as secure as possible
+
+# Parameters:
+#   IAMUserArn:
+#     Type: String
+#     Description: ARN of the IAM User allowed to access the bucket
+
+Resources:
+  S3BUCKET:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: riweajs3bucket986598659865
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      
+      VersioningConfiguration:
+        Status: Enabled
+
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      Tags:
+        - Key: Name
+          Value: Secureriwajbucket
+        - Key: Environment
+          Value: Dev
+
+  HttpsBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref S3BUCKET
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:*'
+            Resource:
+              - !Sub "arn:aws:s3:::${S3BUCKET}"
+              - !Sub "arn:aws:s3:::${S3BUCKET}/*"
+            Condition:
+              Bool:
+                'aws:SecureTransport': false
+          
+          - Sid: DenynUnencryptedObjectUploads
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:PutObject'
+            Resource:
+              - !Sub "arn:aws:s3:::${S3BUCKET}/*"
+            
+  
+          # - Sid: AllowSpecificIAMUserAccess
+          #   Effect: Allow
+          #   Principal:
+          #     AWS: !Ref IAMUserArn
+          #   Action:
+          #     - s3:GetObject
+          #     - s3:PutObject
+          #   Resource: !Sub "arn:aws:s3:::${S3BUCKET}/*"
+Outputs:
+  BucketName:
+    Description: Secure S3 Bucket Name
+    Value: !Ref S3BUCKET
+
+  BucketArn:
+    Description: Secure S3 Bucket ARN
+    Value: !GetAtt S3BUCKET.Arn

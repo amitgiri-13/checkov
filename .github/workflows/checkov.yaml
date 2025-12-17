@@ -1,0 +1,52 @@
+name: Checkov Single File Scan
+
+on:
+  workflow_dispatch:
+    inputs:
+      file_path:
+        description: "Path to the CloudFormation YAML file (e.g. vpc.yaml)"
+        required: true
+        type: string
+
+jobs:
+  checkov-scan:
+    name: Scan CloudFormation File with Checkov
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Checkov
+        run: |
+          pip install --upgrade pip
+          pip install checkov
+
+      - name: Validate file exists
+        run: |
+          if [ ! -f "${{ inputs.file_path }}" ]; then
+            echo "❌ File not found: ${{ inputs.file_path }}"
+            exit 1
+          fi
+
+      - name: Run Checkov on selected file and generate HTML report
+        run: |
+          mkdir -p checkov-report
+          checkov \
+            --file "./${{ inputs.file_path }}" \
+            --framework cloudformation \
+            --file-type yaml \
+            --output cli,html \
+            --output-file-path checkov-report/checkov-report.html \
+            --soft-fail false
+
+      - name: Upload Checkov HTML report
+        uses: actions/upload-artifact@v4
+        with:
+          name: checkov-html-report
+          path: checkov-report/checkov-report.html
