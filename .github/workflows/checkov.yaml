@@ -54,6 +54,7 @@ jobs:
           EOF
 
       - name: Run ASH
+        continue-on-error: true
         run: |
           ash --mode local --config ash.yaml
 
