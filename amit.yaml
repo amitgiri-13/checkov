@@ -7,6 +7,10 @@ Parameters:
     Type: String
     Description: "Bucket name must be globally unique"
 
+  LoggingBucket:
+    Type: String
+    Description: "Destination bucket for logging"
+
 Resources:
   S3Bucket:
     Type: AWS::S3::Bucket
@@ -34,7 +38,28 @@ Resources:
         ServerSideEncryptionConfiguration:
           - ServerSideEncryptionByDefault:
               SSEAlgorithm: "AES256"
-              
+
+      LoggingConfiguration:
+        DestinationBucketName: !Ref LoggingBucket
+        LogFilePrefix: "S3-logs"
+
+  S3BucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref S3Bucket
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Action:
+              - 's3:*'
+            Effect: Deny
+            Resource: !Join
+              - ''
+              - - 'arn:aws:s3:::'
+                - !Ref S3Bucket
+                - /*
+            Principal: '*'
+
 Outputs:
   BucketName:
     Description: "S3 Bucket Name"
