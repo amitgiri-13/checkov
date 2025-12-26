@@ -1,21 +1,73 @@
 ---
-AWSTemplateFormatVersion: "2010-09-09"
-Description: "Template for secure S3 bucket provisioning"
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  Secure S3 bucket with access logging enabled.
+  Logs are stored in a separate secure S3 bucket.
 
 Parameters:
-  BucketName:
+  DataBucketName:
     Type: String
-    Description: "Bucket name must be globally unique"
+    Description: Name of the primary S3 bucket
 
-  LoggingBucket:
+  LogsBucketName:
     Type: String
-    Description: "Destination bucket for logging"
+    Description: Name of the S3 bucket to store access Logs
 
 Resources:
-  S3Bucket:
+
+  AccessLogsBucket:
     Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+
     Properties:
-      BucketName: !Ref BucketName
+      BucketName: !Ref LogsBucketName
+
+      VersioningConfiguration:
+        Status: Enabled
+
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerPreferred
+
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+
+  AccessLogsBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+
+    Properties:
+      Bucket: !Ref AccessLogsBucket
+
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AllowS3Logging
+            Effect: Allow
+            Principal:
+              Service: logging.s3.amazonaws.com
+            Action: s3:PutObject
+            Resource: !Sub arn:aws:s3:::${LogsBucketName}/*
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+
+  SecureDataBucket:
+    Type: AWS::S3::Bucket
+
+    Properties:
+      BucketName: !Ref DataBucketName
+
+      VersioningConfiguration:
+        Status: Enabled
 
       OwnershipControls:
         Rules:
@@ -27,44 +79,41 @@ Resources:
         IgnorePublicAcls: true
         RestrictPublicBuckets: true
 
-      VersioningConfiguration:
-        Status: Enabled
-
-      Tags:
-        - Key: "Env"
-          Value: "Lab"
+      LoggingConfiguration:
+        DestinationBucketName: !Ref AccessLogsBucket
+        LogFilePrefix: data-bucket-access-logs/
 
       BucketEncryption:
         ServerSideEncryptionConfiguration:
           - ServerSideEncryptionByDefault:
-              SSEAlgorithm: "AES256"
+              SSEAlgorithm: AES256
 
-      LoggingConfiguration:
-        DestinationBucketName: !Ref LoggingBucket
-        LogFilePrefix: "S3-logs"
 
-  S3BucketPolicy:
+  SecureDataBucketPolicy:
     Type: AWS::S3::BucketPolicy
+
     Properties:
-      Bucket: !Ref S3Bucket
+      Bucket: !Ref SecureDataBucket
+
       PolicyDocument:
-        Version: 2012-10-17
+        Version: '2012-10-17'
         Statement:
-          - Action:
-              - 's3:*'
+          - Sid: DenyInsecureTransport
             Effect: Deny
-            Resource: !Join
-              - ''
-              - - 'arn:aws:s3:::'
-                - !Ref S3Bucket
-                - /*
-            Principal: '*'
+            Principal: "*"
+            Action: "s3:*"
+            Resource:
+              - !Sub arn:aws:s3:::${DataBucketName}
+              - !Sub arn:aws:s3:::${DataBucketName}/*
+            Condition:
+              Bool:
+                aws:SecureTransport: false
 
 Outputs:
-  BucketName:
-    Description: "S3 Bucket Name"
-    Value: !Ref S3Bucket
+  DataBucket:
+    Description: Secure primary S3 bucket
+    Value: !Ref SecureDataBucket
 
-  BucketArn:
-    Description: "S3 Bucket Arn"
-    Value: !GetAtt S3Bucket.Arn
+  LogsBucket:
+    Description: S3 bucket storing access logs
+    Value: !Ref AccessLogsBucket
